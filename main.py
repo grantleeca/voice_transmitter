@@ -75,7 +75,7 @@ class AudioTransmitter(threading.Thread):
     def __init__(self, logger: logging.Logger, s: socket.socket, address, sample_size, channels, rate, chunk):
         super().__init__()
 
-        self.stop = False
+        self.running = True
         self._logger = logger
         self._socket = s
         self._client_address = address
@@ -84,20 +84,14 @@ class AudioTransmitter(threading.Thread):
         self._rate = rate
         self._chunk = chunk
 
-    def encode(self, data):
-        pass
-
-    def decode(self, data):
-        pass
-
     def send_data(self, data):
         try:
             self._socket.sendto(data, self._client_address)
-            self._logger.debug(f'Sendall {len(data)} data.')
+            self._logger.debug(f'Sendto {len(data)} data.')
             return True
 
         except ConnectionError:
-            self._logger.info('Sendall error, disconnect.')
+            self._logger.info('Sendto error, disconnect.')
             return False
 
     def recv_data(self, buf_size):
@@ -112,34 +106,34 @@ class AudioTransmitter(threading.Thread):
             return None
 
     def run(self):
+        self.running = True
         self.receiver()
 
     def receiver(self):
         self._logger.debug('Begin recv voice data.')
         with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, output=True) as stream:
-            while not self.stop:
-                data = self.recv_data(8192)
-                if data is None:
-                    break
+            data = self.recv_data(8192)
+            self._logger.debug(f"Read {len(data)} from {self._client_address}.")
 
-                self._logger.debug(f"Read {len(data)} from {self._client_address}.")
+            while self.running and data is not None:
                 stream.write(data)
+
+                data = self.recv_data(8192)
+                self._logger.debug(f"Read {len(data)} from {self._client_address}.")
 
     def sender(self):
         self._logger.debug('Begin sender.')
-        # while not self.stop:
-        #     time.sleep(1)
-        #     if not self.send_data(time.strftime('%A %Y-%m-%d %H:%M:%S %z %c').encode('utf-8')):
-        #         break
 
         with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, input=True,
                                frames_per_buffer=self._chunk) as stream:
             self._logger.debug('Start send voice data.')
-            while not self.stop:
+
+            data = stream.read(self._chunk)
+            self._logger.debug(f"Read {len(data)} from stream.")
+
+            while self.running and self.send_data(data):
                 data = stream.read(self._chunk)
                 self._logger.debug(f"Read {len(data)} from stream.")
-                if not self.send_data(data):
-                    break
 
 
 class UDPHandler(socketserver.BaseRequestHandler):
