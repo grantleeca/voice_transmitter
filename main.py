@@ -107,11 +107,13 @@ class AudioTransmitter(threading.Thread):
 
     def run(self):
         self.running = True
-        self.receiver()
+        # self.receiver()
 
     def receiver(self):
+        self._logger.debug(f'Begin receiver. format:{self._size}, channels:{self._channels}, rate:{self._rate}')
+
         with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, output=True) as stream:
-            self._logger.debug('Opened audio stream.')
+            self._logger.debug('Opened output audio stream.')
             while self.running:
                 data = self.recv_data(8192)
                 if data is None:
@@ -123,11 +125,12 @@ class AudioTransmitter(threading.Thread):
         self.running = False
 
     def sender(self):
-        self._logger.debug('Begin sender.')
+        self._logger.debug(
+            f'Begin sender. format:{self._size}, channels:{self._channels}, rate:{self._rate}, chunk:{self._chunk}')
 
         with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, input=True,
                                frames_per_buffer=self._chunk) as stream:
-            self._logger.debug('Start send voice data.')
+            self._logger.debug('Opened input audio stream.')
 
             while self.running:
                 data = stream.read(self._chunk)
