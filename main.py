@@ -5,7 +5,6 @@ import socket
 import socketserver
 import sys
 import threading
-import time
 import wave
 from contextlib import contextmanager
 from logging.handlers import RotatingFileHandler
@@ -73,67 +72,84 @@ def play_audio(wave_file):
 
 
 class AudioTransmitter(threading.Thread):
-    def __init__(self, logger: logging.Logger, s: socket.socket, sample_size, channels, rate, chunk):
+    def __init__(self, logger: logging.Logger, s: socket.socket, address, sample_size, channels, rate, chunk):
         super().__init__()
 
         self.stop = False
         self._logger = logger
-        self.socket = s
+        self._socket = s
+        self._client_address = address
         self._size = sample_size
         self._channels = channels
         self._rate = rate
         self._chunk = chunk
+
+    def encode(self, data):
+        pass
+
+    def decode(self, data):
+        pass
+
+    def send_data(self, data):
+        try:
+            self._socket.sendto(data, self._client_address)
+            self._logger.debug(f'Sendall {len(data)} data.')
+            return True
+
+        except ConnectionError:
+            self._logger.info('Sendall error, disconnect.')
+            return False
+
+    def recv_data(self, buf_size):
+        try:
+            response = self._socket.recvfrom(buf_size)
+            self._logger.debug(f"from {response[1]} recv {len(response[0])} data.")
+            self._client_address = response[1]
+            return response[0]
+
+        except ConnectionError:
+            self._logger.info('recv error, disconnect.')
+            return None
 
     def run(self):
         self.receiver()
 
     def receiver(self):
         self._logger.debug('Begin recv voice data.')
-        try:
+        with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, output=True) as stream:
             while not self.stop:
-                data = self.socket.recv(8192)
-                self._logger.info(f"Recv: {data.decode('utf-8')}")
-        # with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, output=True) as stream:
-        #     while not self.stop:
-        #         data = self.socket.recv(8192)
-        #         self._logger.debug(f"Read {len(data)} from socket.")
-        #         stream.write(data)
-        except ConnectionError:
-            self._logger.info("Receiver disconnected.")
+                data = self.recv_data(8192)
+                if data is None:
+                    break
+
+                self._logger.debug(f"Read {len(data)} from {self._client_address}.")
+                stream.write(data)
 
     def sender(self):
         self._logger.debug('Begin sender.')
-        try:
+        # while not self.stop:
+        #     time.sleep(1)
+        #     if not self.send_data(time.strftime('%A %Y-%m-%d %H:%M:%S %z %c').encode('utf-8')):
+        #         break
+
+        with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, input=True,
+                               frames_per_buffer=self._chunk) as stream:
+            self._logger.debug('Start send voice data.')
             while not self.stop:
-                time.sleep(1)
-                self.socket.sendall(time.strftime('%Y%m%d %H:%M:%S %z %A %B').encode('utf-8'))
-
-        except ConnectionError:
-            self._logger.info('Sender disconnected.')
-
-        # with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, input=True,
-        #                        frames_per_buffer=self._chunk) as stream:
-        #     self._logger.debug('Start send voice data.')
-        #     while not self.stop:
-        #         data = stream.read(self._chunk)
-        #         self._logger.debug(f"Read {len(data)} from stream.")
-        #         self.socket.sendall(data)
+                data = stream.read(self._chunk)
+                self._logger.debug(f"Read {len(data)} from stream.")
+                if not self.send_data(data):
+                    break
 
 
-class TCPHandler(socketserver.BaseRequestHandler):
+class UDPHandler(socketserver.BaseRequestHandler):
     logger = None
 
-    def recv(self, buf_size: int):
-        return self.request.recv(buf_size).strip().decode('utf-8')
-
-    def send(self, msg: str):
-        self.request.sendall(msg.encode('utf-8'))
-
     def handle(self):
-        self.logger.info(f"{self.client_address} linked.")
+        command = self.request[0].strip().decode('utf-8')
+        s = self.request[1]
 
-        command = self.recv(1024)
-        self.logger.info(f'Recv command: {command}')
+        self.logger.info(f"From {self.client_address} recv: {command}.")
         cmds = command.split(' ')
         if len(cmds) != 5 or cmds[0] != 'AudioTransmitter' or cmds[1] != 'V1':
             self.logger.warning(f"Invalid command: {command}")
@@ -143,18 +159,19 @@ class TCPHandler(socketserver.BaseRequestHandler):
         sample_size = int(cmds[3].split('=')[1])
         rate = int(cmds[4].split('=')[1])
 
-        self.send('OK')
+        s.sendto('OK'.encode('utf-8'), self.client_address)
 
         self.logger.info(f'Service information: sample_size: {sample_size}, channels: {channels}, rate: {rate}.')
-        server = AudioTransmitter(self.logger, self.request, sample_size, channels, rate, CHUNK)
+        server = AudioTransmitter(self.logger, s, self.client_address, sample_size, channels, rate, CHUNK)
         server.start()
         server.sender()
 
 
-class TCPClient:
+class UDPClient:
     def __init__(self, logger):
         self._logger = logger
-        self._conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._server_addr = None
 
     def __enter__(self):
         return self
@@ -163,22 +180,25 @@ class TCPClient:
         self.close()
 
     def close(self):
-        self._conn.close()
-        self._conn = None
+        self._socket.close()
+        self._socket = None
 
     def connect(self, addr):
-        self._logger.debug(f"Begin connect to {addr}")
-        self._conn.connect(addr)
+        # self._logger.debug(f"Begin connect to {addr}")
+        # self._conn.connect(addr)
+        self._server_addr = addr
         self._logger.info(f"Connected {addr}.")
 
-    def send_command(self, buf: str):
-        self._conn.sendall(buf.encode('utf-8'))
-        return self._conn.recv(1024).decode('utf-8')
+    def send_msg(self, msg: str):
+        self._socket.sendto(msg.encode('utf-8'), self._server_addr)
+        return self._socket.recvfrom(4096)
+        # return self._conn.recv(1024).decode('utf-8')
 
     def start(self, addr):
         self.connect(addr)
-        if self.send_command(f"AudioTransmitter V1 CHANNELS={CHANNELS} FORMAT={FORMAT} RATE={RATE}") == 'OK':
-            at = AudioTransmitter(self._logger, self._conn, FORMAT, CHANNELS, RATE, CHUNK)
+        response = self.send_msg(f"AudioTransmitter V1 CHANNELS={CHANNELS} FORMAT={FORMAT} RATE={RATE}")
+        if response == 'OK':
+            at = AudioTransmitter(self._logger, self._socket, self._server_addr, FORMAT, CHANNELS, RATE, CHUNK)
             at.start()
             at.sender()
 
@@ -221,13 +241,13 @@ def main():
     if args.server:
         logger.info('Begin TCP listen %d.' % port)
 
-        TCPHandler.logger = logger
-        with socketserver.TCPServer(('0.0.0.0', port), TCPHandler) as server:
+        UDPHandler.logger = logger
+        with socketserver.UDPServer(('0.0.0.0', port), UDPHandler) as server:
             server.serve_forever()
 
     else:
         if args.host:
-            with TCPClient(logger) as client:
+            with UDPClient(logger) as client:
                 client.start((args.host, port))
         else:
             logger.warning('In client mode, the name or IP address of the server to bo connected must entered.')
