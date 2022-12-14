@@ -87,7 +87,7 @@ class AudioTransmitter(threading.Thread):
     def send_data(self, data):
         try:
             self._socket.sendto(data, self._client_address)
-            self._logger.debug(f'Sendto {len(data)} data.')
+            # self._logger.debug(f'Sendto {len(data)} data.')
             return True
 
         except ConnectionError:
@@ -110,20 +110,17 @@ class AudioTransmitter(threading.Thread):
         self.receiver()
 
     def receiver(self):
-        self._logger.debug('Begin recv voice data.')
         with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, output=True) as stream:
-            self._logger.debug('Open audio stream finished.')
+            self._logger.debug('Opened audio stream.')
+            while self.running:
+                data = self.recv_data(8192)
+                if data is None:
+                    break
 
-            data = self.recv_data(8192)
-            self._logger.debug(f"Read {len(data)} from {self._client_address}.")
-
-            while self.running and data is not None:
                 stream.write(data)
 
-                data = self.recv_data(8192)
-                self._logger.debug(f"Read {len(data)} from {self._client_address}.")
-
         self._logger.info('Voice receiver finished.')
+        self.running = False
 
     def sender(self):
         self._logger.debug('Begin sender.')
@@ -132,14 +129,13 @@ class AudioTransmitter(threading.Thread):
                                frames_per_buffer=self._chunk) as stream:
             self._logger.debug('Start send voice data.')
 
-            data = stream.read(self._chunk)
-            self._logger.debug(f"Read {len(data)} from stream.")
-
-            while self.running and self.send_data(data):
+            while self.running:
                 data = stream.read(self._chunk)
-                self._logger.debug(f"Read {len(data)} from stream.")
+                if not self.send_data(data):
+                    break
 
         self._logger.info('Voice sender finished.')
+        self.running = False
 
 
 class UDPHandler(socketserver.BaseRequestHandler):
