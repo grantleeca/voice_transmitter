@@ -187,8 +187,9 @@ class UDPClient:
 
     def send_msg(self, msg: str):
         self._socket.sendto(msg.encode('utf-8'), self._server_addr)
-        return self._socket.recvfrom(4096)
-        # return self._conn.recv(1024).decode('utf-8')
+        response = self._socket.recvfrom(4096)
+        self._server_addr = response[1]
+        return response[0].decode('utf-8')
 
     def start(self, addr):
         self.connect(addr)
