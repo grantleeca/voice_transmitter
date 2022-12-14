@@ -89,20 +89,28 @@ class AudioTransmitter(threading.Thread):
 
     def receiver(self):
         self._logger.debug('Begin recv voice data.')
-        while not self.stop:
-            data = self.socket.recv(8192)
-            self._logger.info(f"Recv: {data.decode('utf-8')}")
+        try:
+            while not self.stop:
+                data = self.socket.recv(8192)
+                self._logger.info(f"Recv: {data.decode('utf-8')}")
         # with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, output=True) as stream:
         #     while not self.stop:
         #         data = self.socket.recv(8192)
         #         self._logger.debug(f"Read {len(data)} from socket.")
         #         stream.write(data)
+        except ConnectionError:
+            self._logger.info("Receiver disconnected.")
 
     def sender(self):
         self._logger.debug('Begin sender.')
-        while not self.stop:
-            time.sleep(1)
-            self.socket.sendall(time.strftime('%Y%m%d %H:%M:%S %z %A %B').encode('utf-8'))
+        try:
+            while not self.stop:
+                time.sleep(1)
+                self.socket.sendall(time.strftime('%Y%m%d %H:%M:%S %z %A %B').encode('utf-8'))
+
+        except ConnectionError:
+            self._logger.info('Sender disconnected.')
+
         # with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, input=True,
         #                        frames_per_buffer=self._chunk) as stream:
         #     self._logger.debug('Start send voice data.')
