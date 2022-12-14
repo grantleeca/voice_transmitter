@@ -112,6 +112,8 @@ class AudioTransmitter(threading.Thread):
     def receiver(self):
         self._logger.debug('Begin recv voice data.')
         with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, output=True) as stream:
+            self._logger.debug('Open audio stream finished.')
+
             data = self.recv_data(8192)
             self._logger.debug(f"Read {len(data)} from {self._client_address}.")
 
@@ -120,6 +122,8 @@ class AudioTransmitter(threading.Thread):
 
                 data = self.recv_data(8192)
                 self._logger.debug(f"Read {len(data)} from {self._client_address}.")
+
+        self._logger.info('Voice receiver finished.')
 
     def sender(self):
         self._logger.debug('Begin sender.')
@@ -134,6 +138,8 @@ class AudioTransmitter(threading.Thread):
             while self.running and self.send_data(data):
                 data = stream.read(self._chunk)
                 self._logger.debug(f"Read {len(data)} from stream.")
+
+        self._logger.info('Voice sender finished.')
 
 
 class UDPHandler(socketserver.BaseRequestHandler):
@@ -162,7 +168,7 @@ class UDPHandler(socketserver.BaseRequestHandler):
 
 
 class UDPClient:
-    def __init__(self, logger):
+    def __init__(self, logger: logging.Logger):
         self._logger = logger
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._server_addr = None
@@ -194,7 +200,10 @@ class UDPClient:
         if response == 'OK':
             at = AudioTransmitter(self._logger, self._socket, self._server_addr, FORMAT, CHANNELS, RATE, CHUNK)
             at.start()
+            self._logger.info('Receiver thread started. begin sender ...')
             at.sender()
+        else:
+            self._logger.warning(f'Unknown response: {response}')
 
 
 def get_parser():
