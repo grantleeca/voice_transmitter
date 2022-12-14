@@ -5,6 +5,7 @@ import socket
 import socketserver
 import sys
 import threading
+import time
 import wave
 from contextlib import contextmanager
 from logging.handlers import RotatingFileHandler
@@ -88,21 +89,27 @@ class AudioTransmitter(threading.Thread):
 
     def receiver(self):
         self._logger.debug('Begin recv voice data.')
-        with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, output=True) as stream:
-            while not self.stop:
-                data = self.socket.recv(8192)
-                self._logger.debug(f"Read {len(data)} from socket.")
-                stream.write(data)
+        while not self.stop:
+            data = self.socket.recv(8192)
+            self._logger.info(f"Recv: {data.decode('utf-8')}")
+        # with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, output=True) as stream:
+        #     while not self.stop:
+        #         data = self.socket.recv(8192)
+        #         self._logger.debug(f"Read {len(data)} from socket.")
+        #         stream.write(data)
 
     def sender(self):
         self._logger.debug('Begin sender.')
-        with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, input=True,
-                               frames_per_buffer=self._chunk) as stream:
-            self._logger.debug('Start send voice data.')
-            while not self.stop:
-                data = stream.read(self._chunk)
-                self._logger.debug(f"Read {len(data)} from stream.")
-                self.socket.sendall(data)
+        while not self.stop:
+            time.sleep(1)
+            self.socket.sendall(time.strftime('%Y%m%d %H:%M:%S %z %A %B').encode('utf-8'))
+        # with open_audio_stream(format=self._size, channels=self._channels, rate=self._rate, input=True,
+        #                        frames_per_buffer=self._chunk) as stream:
+        #     self._logger.debug('Start send voice data.')
+        #     while not self.stop:
+        #         data = stream.read(self._chunk)
+        #         self._logger.debug(f"Read {len(data)} from stream.")
+        #         self.socket.sendall(data)
 
 
 class TCPHandler(socketserver.BaseRequestHandler):
@@ -211,8 +218,11 @@ def main():
             server.serve_forever()
 
     else:
-        with TCPClient(logger) as client:
-            client.start((args.host, port))
+        if args.host:
+            with TCPClient(logger) as client:
+                client.start((args.host, port))
+        else:
+            logger.warning('In client mode, the name or IP address of the server to bo connected must entered.')
 
 
 if __name__ == '__main__':
