@@ -18,14 +18,15 @@ FORMAT = pyaudio.paInt16  # 采样位数
 CHANNELS = 1  # 单声道
 RATE = 44100  # 采样频率
 
+pa = pyaudio.PyAudio()
+
 
 @contextmanager
 def open_audio_stream(*args, **kwargs):
     # instantiate PyAudio (1)
-    p = pyaudio.PyAudio()
 
     # open stream (2)
-    stream = p.open(*args, **kwargs)
+    stream = pa.open(*args, **kwargs)
 
     # play stream (3)
     yield stream
@@ -35,7 +36,7 @@ def open_audio_stream(*args, **kwargs):
     stream.close()
 
     # close PyAudio (5)
-    p.terminate()
+    # p.terminate()
 
 
 def record_audio(wave_out_path, record_second):
@@ -56,6 +57,8 @@ def record_audio(wave_out_path, record_second):
 
         wf.close()
 
+    pa.terminate()
+
 
 def play_audio(wave_file):
     with wave.open(wave_file, 'rb') as wf:
@@ -69,6 +72,8 @@ def play_audio(wave_file):
             while len(data):
                 stream.write(data)
                 data = wf.readframes(CHUNK)
+
+    pa.terminate()
 
 
 class AudioTransmitter(threading.Thread):
@@ -107,7 +112,7 @@ class AudioTransmitter(threading.Thread):
 
     def run(self):
         self.running = True
-        # self.receiver()
+        self.receiver()
 
     def receiver(self):
         self._logger.debug(f'Begin receiver. format:{self._size}, channels:{self._channels}, rate:{self._rate}')
@@ -256,6 +261,40 @@ def main():
             logger.warning('In client mode, the name or IP address of the server to bo connected must entered.')
 
 
+# repeat_q = queue.Queue()
+# instantiate PyAudio (1)
+# pa = pyaudio.PyAudio()
+
+
+# def repeat_play():
+#     print("Worker start.")
+#     with open_audio_stream(pa, format=FORMAT, channels=CHANNELS, rate=RATE, output=True) as stream:
+#         while True:
+#             data = repeat_q.get()
+#             stream.write(data)
+#             repeat_q.task_done()
+
+
+# def Repeater(record_second):
+#     print("start work thread.")
+#     threading.Thread(target=repeat_play, daemon=True).start()
+#
+#     print("open input audio stream.")
+#     with open_audio_stream(pa, format=FORMAT,
+#                            channels=CHANNELS,
+#                            rate=RATE,
+#                            input=True,
+#                            frames_per_buffer=CHUNK) as stream:
+#
+#         for _ in range(0, int(RATE * record_second / CHUNK)):
+#             data = stream.read(CHUNK)
+#             repeat_q.put(data)
+#
+#     repeat_q.join()
+#     print('Finished')
+
+
 if __name__ == '__main__':
     # record_audio('test.wav', 10)
     main()
+    # Repeater(3)
