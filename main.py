@@ -92,7 +92,6 @@ class AudioTransmitter(threading.Thread):
     def send_data(self, data):
         try:
             self._socket.sendto(data, self._client_address)
-            # self._logger.debug(f'Sendto {len(data)} data.')
             return True
 
         except ConnectionError:
@@ -101,13 +100,14 @@ class AudioTransmitter(threading.Thread):
 
     def recv_data(self, buf_size):
         try:
+            self._socket.settimeout(3.0)
             response = self._socket.recvfrom(buf_size)
-            self._logger.debug(f"from {response[1]} recv {len(response[0])} data.")
             self._client_address = response[1]
             return response[0]
 
-        except ConnectionError:
-            self._logger.info('recv error, disconnect.')
+        except (ConnectionError, TimeoutError) as e:
+            self._logger.info(f'recv error, disconnect. {str(e)}')
+            self.running = False
             return None
 
     def run(self):
@@ -127,7 +127,6 @@ class AudioTransmitter(threading.Thread):
                 stream.write(data)
 
         self._logger.info('Voice receiver finished.')
-        self.running = False
 
     def sender(self):
         self._logger.debug(
@@ -143,7 +142,6 @@ class AudioTransmitter(threading.Thread):
                     break
 
         self._logger.info('Voice sender finished.')
-        self.running = False
 
 
 class UDPHandler(socketserver.BaseRequestHandler):
