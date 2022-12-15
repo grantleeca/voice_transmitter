@@ -46,6 +46,7 @@ class AudioTransmitter(threading.Thread):
         if self.stream:
             self.stream.stop_stream()
             self.stream.close()
+            self.stream = None
 
     def finish(self):
         self.running = False
@@ -59,8 +60,9 @@ class TransServer(AudioTransmitter):
 
     def run(self):
         try:
+            self._socket.settimeout(3.0)
+
             while self.running:
-                self._socket.settimeout(3.0)
                 response = self._socket.recvfrom(8192)
                 if self._address != response[1]:
                     self._logger.warning(f'Address wrong: {self._address}: {response[1]}')
@@ -70,6 +72,9 @@ class TransServer(AudioTransmitter):
 
         except (ConnectionError, TimeoutError) as e:
             self._logger.info(f'recv error, disconnect. {str(e)}')
+
+        finally:
+            self._socket.settimeout(None)
 
 
 class TransClient(AudioTransmitter):
@@ -101,17 +106,17 @@ class UDPHandler(socketserver.BaseRequestHandler):
         cmds = command.split(' ')
         if len(cmds) != 5 or cmds[0] != 'AudioTransmitter' or cmds[1] != 'V1':
             self.logger.warning(f"Invalid command: {command}")
-            return command
+            return
 
-        channels = int(cmds[2].split('=')[1])
-        size = int(cmds[3].split('=')[1])
-        rate = int(cmds[4].split('=')[1])
+        args = {'format': int(cmds[3].split('=')[1]),
+                'channels': int(cmds[2].split('=')[1]),
+                'rate': int(cmds[4].split('=')[1])}
 
         s.sendto('OK'.encode('utf-8'), self.client_address)
 
-        self.logger.info(f'Service information: sample_size: {size}, channels: {channels}, rate: {rate}.')
-        with TransClient(self.logger, s, self.client_address, format=size, channels=channels, rate=rate) as client, \
-                TransServer(self.logger, s, self.client_address, format=size, channels=channels, rate=rate) as server:
+        self.logger.info(f"Service information: {args}.")
+        with TransClient(self.logger, s, self.client_address, **args) as client, \
+                TransServer(self.logger, s, self.client_address, **args) as server:
             server.start()
             client.start()
 
