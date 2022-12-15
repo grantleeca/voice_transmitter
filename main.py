@@ -21,11 +21,13 @@ class AudioTransmitter(threading.Thread):
     pa = None
 
     @classmethod
-    def open_stream(cls, *args, **kwargs):
+    def open_stream(cls, format=None, channels=None, rate=None, **kwargs):
         if cls.pa is None:
             cls.pa = pyaudio.PyAudio()
 
-        return cls.pa.open(*args, **kwargs)
+        return cls.pa.open(format=format if format else FORMAT,
+                           channels=channels if channels else CHANNELS,
+                           rate=rate if rate else RATE, **kwargs)
 
     def __init__(self, logger: logging.Logger, s: socket.socket, address):
         super().__init__()
@@ -109,7 +111,7 @@ class UDPHandler(socketserver.BaseRequestHandler):
 
         self.logger.info(f'Service information: sample_size: {size}, channels: {channels}, rate: {rate}.')
         with TransClient(self.logger, s, self.client_address, format=size, channels=channels, rate=rate) as client, \
-             TransServer(self.logger, s, self.client_address, format=size, channels=channels, rate=rate) as server:
+                TransServer(self.logger, s, self.client_address, format=size, channels=channels, rate=rate) as server:
             server.start()
             client.start()
 
