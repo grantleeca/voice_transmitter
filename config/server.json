@@ -1,0 +1,52 @@
+{
+  "stream": {
+    "format": 8,
+    "channels": 1,
+    "rate": 44100,
+    "chunk": 1024
+  },
+  "server": {
+    "model": "TCP",
+    "port": 1029
+  },
+  "logging": {
+    "version": 1,
+    "disable_existing_loggers": false,
+    "formatters": {
+      "console": {
+        "format": "%(levelname)s %(asctime)s %(filename)s %(lineno)-6s: %(message)s",
+        "datefmt": "%H:%M:%S"
+      },
+      "single_line": {
+        "format": "%(levelname)-8s %(asctime)-20s %(filename)-16s %(lineno)-6s %(funcName)-20s: %(message)s",
+        "datefmt": "%Y-%m-%d %H:%M:%S %A"
+      }
+    },
+    "handlers": {
+      "console": {
+        "class": "logging.StreamHandler",
+        "level": "DEBUG",
+        "formatter": "console",
+        "stream": "ext://sys.stdout"
+      },
+      "info_file_handler": {
+        "class": "logging.handlers.RotatingFileHandler",
+        "level": "DEBUG",
+        "formatter": "single_line",
+        "filename": "log/voice_transmitter.log",
+        "maxBytes": 5120000,
+        "backupCount": 3,
+        "delay": true
+      }
+    },
+    "loggers": {
+      "voice_transmitter": {
+        "level": "DEBUG",
+        "handlers": [
+          "console",
+          "info_file_handler"
+        ]
+      }
+    }
+  }
+}

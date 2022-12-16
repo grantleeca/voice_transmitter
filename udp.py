@@ -3,7 +3,7 @@ import socket
 import socketserver
 import struct
 
-from stream_thread import StreamThread, HEAD_FORMAT, HEAD_VERSION, CHUNK
+from stream_thread import StreamThread, HEAD_FORMAT, HEAD_VERSION
 
 
 class UDPReceiver(StreamThread):
@@ -77,7 +77,8 @@ class UDPHandler(socketserver.BaseRequestHandler):
 
         args = {'format': request[1],
                 'channels': request[2],
-                'rate': request[3]}
+                'rate': request[3],
+                'chunk': request[4]}
 
         self.logger.info(f"Service information: {args}.")
 
@@ -117,7 +118,7 @@ class UDPClient:
 
         return True
 
-    def udp_start(self, addr, **kwargs):
+    def connect(self, addr, chunk, **kwargs):
         self._logger.info(f"Connected {addr}.")
 
         if not self.login(addr, **kwargs):
@@ -125,7 +126,7 @@ class UDPClient:
             return
 
         with UDPReceiver(self._logger, self._socket, addr) as server, UDPSender(self._logger, self._socket, addr,
-                                                                                chunk=CHUNK) as client:
+                                                                                chunk=chunk) as client:
             server.start()
             client.start()
 

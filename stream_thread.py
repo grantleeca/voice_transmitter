@@ -3,10 +3,10 @@ import threading
 
 import pyaudio
 
-HEAD_FORMAT = '@20siii'
-HEAD_VERSION = 'AudioTransmitter 001'
+HEAD_FORMAT = '@20siiii'
+HEAD_VERSION = 'AudioTransmitter 001'.encode('utf-8')
 
-CHUNK = 1024  # 每个缓冲区的帧数
+# CHUNK = 1024  # 每个缓冲区的帧数
 
 
 class StreamThread(threading.Thread):

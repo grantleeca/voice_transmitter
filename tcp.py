@@ -3,13 +3,14 @@ import socket
 import socketserver
 import struct
 
-from stream_thread import StreamThread, HEAD_FORMAT, CHUNK
+from stream_thread import StreamThread, HEAD_FORMAT, HEAD_VERSION
 
 
 class TCPReceiver(StreamThread):
-    def __init__(self, logger: logging.Logger, s: socket.socket, **kwargs):
+    def __init__(self, logger: logging.Logger, s: socket.socket, chunk=None, **kwargs):
         super().__init__(logger)
 
+        logger.debug(f'init parameter: {kwargs}')
         self.socket = s
         self.stream = self.open_stream(output=True, **kwargs)
 
@@ -63,22 +64,25 @@ class TCPHandler(socketserver.BaseRequestHandler):
 
         request = self.recv_head()
         if request is None:
+            self.send_reply('Invalid request.')
             self.logger.debug('Invalid request.')
             return
 
-        if request[0] != 'AudioTransmitter 001':
-            self.logger.debug('invalid protocol or version.')
+        if request[0] != HEAD_VERSION:
+            self.send_reply('Invalid protocol or version')
+            self.logger.debug(f'invalid protocol or version.: {request[0]}.')
             return
 
         self.send_reply('OK')
 
         args = {'format': request[1],
                 'channels': request[2],
-                'rate': request[3]}
+                'rate': request[3],
+                'chunk': request[4]}
 
         self.logger.info(f"Service information: {args}.")
 
-        with TCPSender(self.logger, self.request, chunk=CHUNK, **args) as client, \
+        with TCPSender(self.logger, self.request, **args) as client, \
                 TCPReceiver(self.logger, self.request, **args) as server:
             server.start()
             client.start()
@@ -90,7 +94,7 @@ class TCPHandler(socketserver.BaseRequestHandler):
 
 
 class TCPClient:
-    def __init__(self, logger):
+    def __init__(self, logger: logging.Logger):
         self._logger = logger
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -104,26 +108,28 @@ class TCPClient:
         self._socket.close()
         self._socket = None
 
-    def login(self, format, channels, rate):
-        data = struct.pack(HEAD_FORMAT, 'AudioTransmitter 001', format, channels, rate)
+    def login(self, format, channels, rate, chunk):
+        data = struct.pack(HEAD_FORMAT, HEAD_VERSION, format, channels, rate, chunk)
         self._socket.sendall(data)
 
+        self._socket.settimeout(None)
         data = self._socket.recv(1024)
+        self._logger.debug(f'Login return {data}')
         return True if data.strip().decode('utf-8') == 'OK' else False
 
-    def connect(self, addr, **kwargs):
+    def connect(self, addr, chunk, **kwargs):
         self._logger.debug(f"Begin connect to {addr}")
 
         self._socket.connect(addr)
 
         self._logger.info(f"Connected {addr}.")
 
-        if not self.login(**kwargs):
+        if not self.login(chunk=chunk, **kwargs):
             self._logger.warning(f'Login failed.')
             return
 
-        with TCPReceiver(self._logger, self._socket) as server, \
-                TCPSender(self._logger, self._socket, chunk=CHUNK) as client:
+        with TCPReceiver(self._logger, self._socket, **kwargs) as server, \
+                TCPSender(self._logger, self._socket, chunk=chunk, **kwargs) as client:
             server.start()
             client.start()
 
