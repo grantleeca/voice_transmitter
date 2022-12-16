@@ -66,7 +66,6 @@ def main(argv):
         info = pa.get_host_api_info_by_index(index)
         print(info)
 
-    pa.
     device_count = pa.get_device_count()
     input_device = pa.get_default_input_device_info()
     output_device = pa.get_default_output_device_info()

@@ -2,6 +2,7 @@ import logging
 import socket
 import socketserver
 import struct
+import time
 
 from stream_thread import StreamThread, HEAD_FORMAT, HEAD_VERSION
 
@@ -10,27 +11,36 @@ class UDPReceiver(StreamThread):
     def __init__(self, logger: logging.Logger, s: socket.socket, address, **kwargs):
         super().__init__(logger)
 
-        self._socket = s
+        self.socket = s
         self._address = address
         self.stream = self.open_stream(output=True, **kwargs)
 
     def run(self):
         try:
-            self._socket.settimeout(3.0)
+            start_time = time.perf_counter()
+            count = 0
 
-            while self.running:
-                response = self._socket.recvfrom(8192)
+            self.socket.settimeout(3.0)
+
+            while True:
+                response = self.socket.recvfrom(8192)
                 if self._address != response[1]:
                     self._logger.warning(f'Address wrong: {self._address}: {response[1]}')
                 self.stream.write(response[0])
 
-            self._logger.info('Voice receiver finished.')
+                count += len(response[0])
+                end_time = time.perf_counter()
+                if end_time - start_time > 1.0:
+                    self._logger.info(f"Receiver speed: {count / 1024 / (end_time - start_time): .2f} KB/s.")
+                    start_time = end_time
+                    count = 0
 
         except Exception as e:
             self._logger.info(f'recv error, disconnect. {type(e)}: {str(e)}')
 
         finally:
-            self._socket.settimeout(None)
+            self.socket.close()
+            self._logger.info('Voice receiver finished.')
 
 
 class UDPSender(StreamThread):
@@ -44,13 +54,15 @@ class UDPSender(StreamThread):
 
     def run(self):
         try:
-            while self.running:
+            while True:
                 self._socket.sendto(self.stream.read(self._chunk), self._address)
 
-            self._logger.info('Voice sender finished.')
+        except Exception as e:
+            self._logger.info(f'Voice sender error, disconnect. {type(e)}, {str(e)}')
 
-        except ConnectionError:
-            self._logger.info('Sendto error, disconnect.')
+        finally:
+            self._socket.close()
+            self._logger.info('Voice sender finished.')
 
 
 class UDPHandler(socketserver.BaseRequestHandler):

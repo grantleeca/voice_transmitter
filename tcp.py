@@ -2,12 +2,13 @@ import logging
 import socket
 import socketserver
 import struct
+import time
 
 from stream_thread import StreamThread, HEAD_FORMAT, HEAD_VERSION
 
 
 class TCPReceiver(StreamThread):
-    def __init__(self, logger: logging.Logger, s: socket.socket, chunk=None, **kwargs):
+    def __init__(self, logger: logging.Logger, s: socket.socket, **kwargs):
         super().__init__(logger)
 
         logger.debug(f'init parameter: {kwargs}')
@@ -16,18 +17,27 @@ class TCPReceiver(StreamThread):
 
     def run(self):
         try:
+            start_time = time.perf_counter()
+            count = 0
+
             self.socket.settimeout(3.0)
-            while self.running:
+            while True:
                 response = self.socket.recv(8192)
                 self.stream.write(response)
 
-            self._logger.info('Voice server finished.')
+                count += len(response)
+                end_time = time.perf_counter()
+                if end_time - start_time > 1.0:
+                    self._logger.info(f"Receiver speed: {count / 1024 / (end_time - start_time): .2f} KB/s.")
+                    start_time = end_time
+                    count = 0
 
         except Exception as e:
-            self._logger.info(f'recv error, disconnect. {type(e)}: {str(e)}')
+            self._logger.debug(f'Voice receiver disconnect. {type(e)}: {str(e)}')
 
         finally:
-            self.socket.settimeout(None)
+            self.socket.close()
+            self._logger.info('Voice receiver disconnect')
 
 
 class TCPSender(StreamThread):
@@ -40,13 +50,15 @@ class TCPSender(StreamThread):
 
     def run(self):
         try:
-            while self.running:
+            while True:
                 self._socket.send(self.stream.read(self._chunk))
 
-            self._logger.info('Voice sender finished.')
+        except Exception as e:
+            self._logger.debug(f'Voice sender disconnect. {type(e)}: {str(e)}')
 
-        except ConnectionError:
-            self._logger.info('Sendto error, disconnect.')
+        finally:
+            self._socket.close()
+            self._logger.info('Voice sender disconnected.')
 
 
 class TCPHandler(socketserver.BaseRequestHandler):
@@ -77,19 +89,16 @@ class TCPHandler(socketserver.BaseRequestHandler):
 
         args = {'format': request[1],
                 'channels': request[2],
-                'rate': request[3],
-                'chunk': request[4]}
+                'rate': request[3]}
 
         self.logger.info(f"Service information: {args}.")
 
-        with TCPSender(self.logger, self.request, **args) as client, \
+        with TCPSender(self.logger, self.request, chunk=request[4], **args) as client, \
                 TCPReceiver(self.logger, self.request, **args) as server:
             server.start()
             client.start()
 
             server.join()
-
-            client.finish()
             client.join()
 
 
@@ -134,9 +143,7 @@ class TCPClient:
             client.start()
 
             input("Press enter key to exit.")
-
-            client.finish()
-            server.finish()
+            self._socket.close()
 
             client.join()
             server.join()

@@ -24,7 +24,7 @@ class StreamThread(threading.Thread):
 
         self._logger = logger
 
-        self.running = True
+        # self.running = True
         self.stream = None
 
     def __enter__(self):
@@ -36,5 +36,5 @@ class StreamThread(threading.Thread):
             self.stream.close()
             self.stream = None
 
-    def finish(self):
-        self.running = False
+    # def finish(self):
+    #     self.running = False
