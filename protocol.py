@@ -6,7 +6,7 @@ LOGIN_FORMAT = '@20siiii'
 LOGIN_VERSION = 'AudioTransmitter 001'.encode('utf-8')
 
 PROTOCOL_HEAD = '@cci'
-PROTOCOL_FLAG = 0x55
+PROTOCOL_FLAG = b'V'
 
 
 class Protocol(object):
@@ -36,15 +36,15 @@ class Protocol(object):
         if flag != PROTOCOL_FLAG:
             raise ConnectionError('Invalid protocol flag.')
 
-        return self._read(size) if compress == 0 else zlib.decompress(self._read(size))
+        return self._read(size) if compress == b'Y' else zlib.decompress(self._read(size))
 
     def write(self, data, compress=False):
         if compress:
             cpd = zlib.compress(data)
-            head = struct.pack(PROTOCOL_HEAD, PROTOCOL_FLAG, 1, len(cpd))
+            head = struct.pack(PROTOCOL_HEAD, PROTOCOL_FLAG, b'Y', len(cpd))
             self.send(head + cpd)
         else:
-            head = struct.pack(PROTOCOL_HEAD, PROTOCOL_FLAG, 0, len(data))
+            head = struct.pack(PROTOCOL_HEAD, PROTOCOL_FLAG, b'N', len(data))
             self.send(head + data)
 
     def login(self, format, channels, rate, chunk):
