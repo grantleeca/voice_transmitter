@@ -36,8 +36,8 @@ def main():
             with TCPClient(logger) as client:
                 client.connect((host, port), **cfg['stream'])
         else:
-            with UDPClient(logger) as client:
-                client.connect((host, port), **cfg['stream'])
+            with UDPClient(logger, (host, port)) as client:
+                client.connect(**cfg['stream'])
 
 
 if __name__ == '__main__':

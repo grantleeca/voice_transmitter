@@ -1,12 +1,10 @@
 import logging
 import threading
+import time
 
 import pyaudio
 
-HEAD_FORMAT = '@20siiii'
-HEAD_VERSION = 'AudioTransmitter 001'.encode('utf-8')
-
-# CHUNK = 1024  # 每个缓冲区的帧数
+from protocol import Protocol
 
 
 class StreamThread(threading.Thread):
@@ -19,13 +17,13 @@ class StreamThread(threading.Thread):
 
         return cls.pa.open(**kwargs)
 
-    def __init__(self, logger: logging.Logger):
+    def __init__(self, logger: logging.Logger, p: Protocol, chunk=None):
         super().__init__()
 
-        self._logger = logger
-
-        # self.running = True
+        self.logger = logger
         self.stream = None
+        self.socket = p
+        self._chunk = chunk
 
     def __enter__(self):
         return self
@@ -36,5 +34,34 @@ class StreamThread(threading.Thread):
             self.stream.close()
             self.stream = None
 
-    # def finish(self):
-    #     self.running = False
+    def run(self):
+        if self._chunk is None:  # receiver
+            stream_type = 'Receiver'
+        else:
+            stream_type = 'Sender'
+
+        try:
+            start_time = time.perf_counter()
+            count = 0
+
+            while True:
+                if self._chunk is None:
+                    data = self.socket.read()
+                    self.stream.write(data)
+                else:
+                    data = self.stream.read(self._chunk)
+                    self.socket.write(data, True)
+
+                count += len(data)
+                end_time = time.perf_counter()
+                if end_time - start_time > 1.0:
+                    self.logger.info(f"{stream_type} speed: {count / 1024 / (end_time - start_time): .2f} KB/s.")
+                    start_time = end_time
+                    count = 0
+
+        except Exception as e:
+            self.logger.debug(f'Voice {stream_type} disconnect. {type(e)}: {str(e)}')
+
+        finally:
+            self.socket.close()
+            self.logger.info(f'Voice {stream_type} disconnect')
