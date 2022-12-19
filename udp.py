@@ -37,7 +37,7 @@ class UDPHandler(socketserver.BaseRequestHandler):
 
             self.logger.info(f"Service information: {args}.")
 
-            with UDPSender(self.logger, self.request[1], self.client_address, **args) as client, \
+            with UDPSender(self.logger, self.request[1], self.client_address, chunk=request[3], **args) as client, \
                     UDPReceiver(self.logger, self.request[1], self.client_address, **args) as server:
                 server.start()
                 client.start()

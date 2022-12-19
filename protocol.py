@@ -36,7 +36,7 @@ class Protocol(object):
         if flag != PROTOCOL_FLAG:
             raise ConnectionError('Invalid protocol flag.')
 
-        return self._read(size) if compress == b'Y' else zlib.decompress(self._read(size))
+        return self._read(size) if compress == b'N' else zlib.decompress(self._read(size))
 
     def write(self, data, compress=False):
         if compress:

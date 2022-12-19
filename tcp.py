@@ -70,7 +70,7 @@ class TCPClient(ProtocolTCP):
 
         self._logger.info(f"Connected {addr}.")
 
-        if self.login(chunk=chunk, **kwargs):
+        if not self.login(chunk=chunk, **kwargs):
             self._logger.warning(f'Login failed.')
             return
 
