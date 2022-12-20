@@ -1,5 +1,6 @@
 import socket
 import struct
+import time
 import zlib
 
 LOGIN_FORMAT = '@20siiii'
@@ -12,6 +13,10 @@ PROTOCOL_FLAG = b'V'
 class Protocol(object):
     def __init__(self, s: socket.socket):
         self._socket = s
+
+        # self._count = 0
+        # self._compress_count = 0
+        # self._show_time = time.perf_counter()
 
     def send(self, data):
         pass
@@ -40,9 +45,16 @@ class Protocol(object):
 
     def write(self, data, compress=False):
         if compress:
-            cpd = zlib.compress(data)
-            head = struct.pack(PROTOCOL_HEAD, PROTOCOL_FLAG, b'Y', len(cpd))
-            self.send(head + cpd)
+            compress_data = zlib.compress(data)
+            # self._count += len(data)
+            # self._compress_count += len(cpd)
+            # now = time.perf_counter()
+            # if now - self._show_time > 3.0:
+            #     print(f"compress {self._compress_count / self._count: .2f}")
+            #     self._show_time = now
+
+            head = struct.pack(PROTOCOL_HEAD, PROTOCOL_FLAG, b'Y', len(compress_data))
+            self.send(head + compress_data)
         else:
             head = struct.pack(PROTOCOL_HEAD, PROTOCOL_FLAG, b'N', len(data))
             self.send(head + data)
@@ -86,7 +98,7 @@ class ProtocolTCP(Protocol):
 
 
 class ProtocolUDP(Protocol):
-    def __init__(self, address, s: socket.socket | None = None):
+    def __init__(self, s: socket.socket, address):
         super().__init__(s)
         self._address = address
 

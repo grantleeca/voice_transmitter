@@ -82,7 +82,7 @@ def main(argv):
         return
 
     if argv[1] == '-r':
-        record_audio(argv[2], 3)
+        record_audio(argv[2], 10)
     elif argv[1] == '-p':
         play_audio(argv[2])
     else:

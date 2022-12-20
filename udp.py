@@ -9,14 +9,14 @@ from stream_thread import StreamThread
 class UDPReceiver(StreamThread):
     def __init__(self, logger: logging.Logger, s: socket.socket, address, **kwargs):
         s.settimeout(3.0)
-        super().__init__(logger, ProtocolUDP(address, s))
+        super().__init__(logger, ProtocolUDP(s, address))
 
         self.stream = self.open_stream(output=True, **kwargs)
 
 
 class UDPSender(StreamThread):
     def __init__(self, logger: logging.Logger, s: socket.socket, address, chunk, **kwargs):
-        super().__init__(logger, ProtocolUDP(address, s))
+        super().__init__(logger, ProtocolUDP(s, address))
 
         self._chunk = chunk
         self.stream = self.open_stream(input=True, frames_per_buffer=chunk, **kwargs)
@@ -28,7 +28,7 @@ class UDPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         self.logger.info(f"{self.client_address} linked.")
 
-        ptc = ProtocolUDP(self.request)
+        ptc = ProtocolUDP(self.request, self.client_address)
         request = ptc.verify()
         if isinstance(request, tuple):
             args = {'format': request[0],
@@ -51,7 +51,7 @@ class UDPHandler(socketserver.BaseRequestHandler):
 
 class UDPClient(ProtocolUDP):
     def __init__(self, logger, address):
-        super().__init__(address, socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+        super().__init__(socket.socket(socket.AF_INET, socket.SOCK_DGRAM), address)
 
         self._logger = logger
 
