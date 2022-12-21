@@ -3,7 +3,7 @@ import json
 import logging
 import socketserver
 from logging.config import dictConfig
-
+from protocol import Protocol
 from tcp import TCPHandler, TCPClient
 from udp import UDPHandler, UDPClient
 
@@ -24,6 +24,8 @@ def main():
     if args.server:
         srv_info = cfg['server']
         port = srv_info.get('port', 1029)
+        Protocol.set_token(srv_info['token'])
+
         logger.info(f"Begin {srv_info['model']} listen %d." % port)
 
         if srv_info['model'] == 'TCP':
@@ -38,6 +40,7 @@ def main():
         client_info = cfg['client']
         host = client_info['host']
         port = client_info.get('port', 1029)
+        Protocol.set_token(client_info['token'])
 
         if client_info['model'] == 'TCP':
             with TCPClient(logger) as client:

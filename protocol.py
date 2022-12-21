@@ -1,3 +1,5 @@
+import calendar
+import hashlib
 import socket
 import struct
 import time
@@ -5,17 +7,54 @@ import zlib
 
 # import rsa
 
-LOGIN_FORMAT = '@20siiii'
 LOGIN_VERSION = 'AudioTransmitter 001'.encode('utf-8')
+LOGIN_FORMAT = '!20siiiii'
+LOGIN_LENGTH = struct.calcsize(LOGIN_FORMAT)
 
-PROTOCOL_HEAD_FORMAT = '@cci'
+PROTOCOL_HEAD_FORMAT = '!cci'
 PROTOCOL_FLAG = b'V'
-
-token: str = ''
-last_login_time = time.gmtime()
 
 
 class Protocol(object):
+    token: str
+    last_login_time: int
+
+    @classmethod
+    def set_token(cls, token):
+        cls.token = token
+        cls.last_login_time = calendar.timegm(time.gmtime())
+
+    @classmethod
+    def hash_token(cls, nt: int):
+        hash512 = hashlib.sha512()
+        hash512.update(cls.token.encode('utf-8'))
+        hash512.update(struct.pack('!i', nt))
+        return hash512.digest()
+
+    @classmethod
+    def _verify_login(cls, data):
+        if len(data) != LOGIN_LENGTH + 64:
+            return 'Invalid login format.'
+
+        response = struct.unpack(LOGIN_FORMAT, data[:LOGIN_LENGTH])
+        if response[0] != LOGIN_VERSION:
+            return 'Invalid request version.'
+
+        if response[5] <= cls.last_login_time:
+            return 'Invalid login time.'
+
+        if cls.hash_token(response[5]) != data[LOGIN_LENGTH:]:
+            return 'Token verify failed.'
+
+        cls.last_login_time = response[5]
+        return response[1:4]
+
+    @classmethod
+    def _pack_login(cls, format, channels, rate, chunk):
+        now = calendar.timegm(time.gmtime())
+        data = struct.pack(LOGIN_FORMAT, LOGIN_VERSION, format, channels, rate, chunk, now)
+        return data + cls.hash_token(now)
+
     def __init__(self, s: socket.socket):
         self._socket = s
 
@@ -55,7 +94,7 @@ class Protocol(object):
             self.send(head + data)
 
     def login(self, format, channels, rate, chunk):
-        self.write(struct.pack(LOGIN_FORMAT, LOGIN_VERSION, format, channels, rate, chunk))
+        self.write(self._pack_login(format, channels, rate, chunk))
 
         self._socket.settimeout(None)
 
@@ -64,21 +103,12 @@ class Protocol(object):
 
     def verify(self):
         data = self.read()
-        if len(data) != struct.calcsize(LOGIN_FORMAT):
-            self.send_msg('Invalid.')
-            return 'Invalid login format.'
+        request = self._verify_login(data)
+        if isinstance(request, tuple):
+            self.send_msg('OK')
+            return request
 
-        request = struct.unpack(LOGIN_FORMAT, data)
-        if len(request) != 5:
-            self.send_msg('Invalid.')
-            return 'Invalid request parameter.'
-
-        if request[0] != LOGIN_VERSION:
-            self.send_msg('Invalid.')
-            return 'Invalid request version.'
-
-        self.send_msg('OK')
-        return request[1:]
+        self.send_msg(request)
 
     def send_msg(self, msg: str):
         self.write(msg.encode('utf-8'))
