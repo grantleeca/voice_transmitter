@@ -16,6 +16,12 @@ class StreamThread(threading.Thread):
 
         return cls.pa.open(**kwargs)
 
+    @classmethod
+    def terminate(cls):
+        if cls.pa:
+            cls.pa.terminate()
+            cls.pa = None
+
     def __init__(self, logger: logging.Logger, p: Protocol, chunk=None):
         super().__init__()
 

@@ -3,7 +3,9 @@ import json
 import logging
 import socketserver
 from logging.config import dictConfig
+
 from protocol import Protocol
+from stream_thread import StreamThread
 from tcp import TCPHandler, TCPClient
 from udp import UDPHandler, UDPClient
 
@@ -21,33 +23,41 @@ def main():
     dictConfig(cfg['logging'])
     logger = logging.getLogger('voice_transmitter')
 
-    if args.server:
-        srv_info = cfg['server']
-        port = srv_info.get('port', 1029)
-        Protocol.set_token(srv_info['token'])
+    try:
+        if args.server:
+            srv_info = cfg['server']
+            port = srv_info.get('port', 1029)
+            Protocol.set_token(srv_info['token'])
 
-        logger.info(f"Begin {srv_info['model']} listen %d." % port)
+            logger.info(f"Begin {srv_info['model']} listen %d." % port)
 
-        if srv_info['model'] == 'TCP':
-            TCPHandler.logger = logger
-            with socketserver.TCPServer(('', port), TCPHandler) as server:
-                server.serve_forever()
+            if srv_info['model'] == 'TCP':
+                TCPHandler.logger = logger
+                with socketserver.TCPServer(('', port), TCPHandler) as server:
+                    server.serve_forever()
+            else:
+                UDPHandler.logger = logger
+                with socketserver.UDPServer(('', port), UDPHandler) as server:
+                    server.serve_forever()
+
         else:
-            UDPHandler.logger = logger
-            with socketserver.UDPServer(('', port), UDPHandler) as server:
-                server.serve_forever()
-    else:
-        client_info = cfg['client']
-        host = client_info['host']
-        port = client_info.get('port', 1029)
-        Protocol.set_token(client_info['token'])
+            client_info = cfg['client']
+            host = client_info['host']
+            port = client_info.get('port', 1029)
+            Protocol.set_token(client_info['token'])
 
-        if client_info['model'] == 'TCP':
-            with TCPClient(logger) as client:
-                client.connect((host, port), **cfg['stream'])
-        else:
-            with UDPClient(logger, (host, port)) as client:
-                client.connect(**cfg['stream'])
+            if client_info['model'] == 'TCP':
+                with TCPClient(logger) as client:
+                    client.connect((host, port), **cfg['stream'])
+            else:
+                with UDPClient(logger, (host, port)) as client:
+                    client.connect(**cfg['stream'])
+
+    except Exception as e:
+        logger.exception(f"Program except exit: {e}.")
+
+    finally:
+        StreamThread.terminate()
 
 
 if __name__ == '__main__':

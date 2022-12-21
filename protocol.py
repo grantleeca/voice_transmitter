@@ -16,13 +16,13 @@ PROTOCOL_FLAG = b'V'
 
 
 class Protocol(object):
-    token: str
-    last_login_time: int
+    token: str = 'password'
+    last_login_time: int = 0
 
     @classmethod
     def set_token(cls, token):
         cls.token = token
-        cls.last_login_time = calendar.timegm(time.gmtime()) - 300
+        cls.last_login_time = 0
 
     @classmethod
     def hash_token(cls, nt: int):
