@@ -81,6 +81,7 @@ class TCPClient(ProtocolTCP):
             sender.start()
 
             input("Press enter key to exit.")
+
             self._socket.close()
 
             sender.join()

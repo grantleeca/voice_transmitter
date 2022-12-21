@@ -12,7 +12,7 @@ CHANNELS = 1  # 单声道
 RATE = 44100  # 采样频率
 
 # instantiate PyAudio (1)
-pa = pyaudio.PyAudio()
+pa: pyaudio.PyAudio()
 
 
 @contextmanager
@@ -61,36 +61,51 @@ def play_audio(wave_file):
                 data = wf.readframes(CHUNK)
 
 
-def main(argv):
-    for index in range(pa.get_host_api_count()):
-        info = pa.get_host_api_info_by_index(index)
+def print_information(audio):
+    print('------------------------ host api information by index --------------------------------------')
+    for index in range(audio.get_host_api_count()):
+        info = audio.get_host_api_info_by_index(index)
         print(info)
 
-    device_count = pa.get_device_count()
-    input_device = pa.get_default_input_device_info()
-    output_device = pa.get_default_output_device_info()
-
+    print('------------------------ device information by index -------------------------------------')
+    device_count = audio.get_device_count()
     for index in range(device_count):
-        info = pa.get_device_info_by_index(index)
+        info = audio.get_device_info_by_index(index)
         print(type(info), info)
 
     print('--------------------------------------------')
+    input_device = audio.get_default_input_device_info()
+    output_device = audio.get_default_output_device_info()
     print(f"Device count = {device_count}.\ninput: {input_device}. \noutput: {output_device}.")
 
-    if len(argv) != 3:
-        print(f'{argv[0]} -r/-p <record file name>')
-        return
 
-    if argv[1] == '-r':
-        record_audio(argv[2], 10)
-    elif argv[1] == '-p':
-        play_audio(argv[2])
-    else:
-        print(f"Invalid command: {argv}")
+def main(argv):
+    global pa
+
+    try:
+        # instantiate PyAudio (1)
+        pa = pyaudio.PyAudio()
+
+        print_information(pa)
+
+        if len(argv) != 3:
+            print(f'{argv[0]} -r/-p <record file name>')
+            return
+
+        if argv[1] == '-r':
+            record_audio(argv[2], 10)
+        elif argv[1] == '-p':
+            play_audio(argv[2])
+        else:
+            print(f"Invalid command: {argv}")
+
+    except OSError as e:
+        print(f"Except {e}.")
+
+    finally:
+        # close PyAudio (5)
+        pa.terminate()
 
 
 if __name__ == '__main__':
     main(sys.argv)
-
-    # close PyAudio (5)
-    pa.terminate()
