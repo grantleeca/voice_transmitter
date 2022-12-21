@@ -47,7 +47,7 @@ class Protocol(object):
             return 'Token verify failed.'
 
         cls.last_login_time = response[5]
-        return response[1:4]
+        return response[1:5]
 
     @classmethod
     def _pack_login(cls, format, channels, rate, chunk):
