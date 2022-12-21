@@ -73,7 +73,7 @@ def print_information(audio):
         info = audio.get_device_info_by_index(index)
         print(type(info), info)
 
-    print('--------------------------------------------')
+    print('------------------------- default device information ------------------------------------')
     input_device = audio.get_default_input_device_info()
     output_device = audio.get_default_output_device_info()
     print(f"Device count = {device_count}.\ninput: {input_device}. \noutput: {output_device}.")
