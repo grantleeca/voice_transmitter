@@ -3,19 +3,21 @@
     "format": 8,
     "channels": 1,
     "rate": 44100,
-    "chunk": 2000
+    "chunk": 2205
   },
   "server": {
     "model": "TCP",
     "port": 1029,
-    "token": "Maya*518"
+    "token": "Maya*518",
+    "compress": false
   },
   "client": {
     "model": "TCP",
     "host": "192.168.1.50",
     "#host": "45.74.72.134",
     "port": 1029,
-    "token": "Maya*518"
+    "token": "Maya*518",
+    "compress": false
   },
   "logging": {
     "version": 1,

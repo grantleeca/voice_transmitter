@@ -27,7 +27,7 @@ def main():
         if args.server:
             srv_info = cfg['server']
             port = srv_info.get('port', 1029)
-            Protocol.set_token(srv_info['token'])
+            Protocol.setup(srv_info['token'], srv_info.get('compress', False))
 
             logger.info(f"Begin {srv_info['model']} listen %d." % port)
 
@@ -44,7 +44,8 @@ def main():
             client_info = cfg['client']
             host = client_info['host']
             port = client_info.get('port', 1029)
-            Protocol.set_token(client_info['token'])
+
+            Protocol.setup(client_info['token'], client_info.get('compress', False))
 
             if client_info['model'] == 'TCP':
                 with TCPClient(logger) as client:

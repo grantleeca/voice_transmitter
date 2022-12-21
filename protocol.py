@@ -17,11 +17,13 @@ PROTOCOL_FLAG = b'V'
 
 class Protocol(object):
     token: str = 'password'
+    compress: bool = True
     last_login_time: int = 0
 
     @classmethod
-    def set_token(cls, token):
+    def setup(cls, token, compress):
         cls.token = token
+        cls.compress = compress
         cls.last_login_time = 0
 
     @classmethod
@@ -84,8 +86,8 @@ class Protocol(object):
 
         return self._read(size) if compress == b'N' else zlib.decompress(self._read(size))
 
-    def write(self, data, compress=False):
-        if compress:
+    def write(self, data):
+        if self.compress:
             compress_data = zlib.compress(data)
             head = struct.pack(PROTOCOL_HEAD_FORMAT, PROTOCOL_FLAG, b'Y', len(compress_data))
             self.send(head + compress_data)
@@ -95,14 +97,10 @@ class Protocol(object):
 
     def login(self, format, channels, rate, chunk):
         self.write(self._pack_login(format, channels, rate, chunk))
-
-        self._socket.settimeout(None)
-
         return self.read().strip().decode('utf-8')
 
     def verify(self):
-        data = self.read()
-        request = self._verify_login(data)
+        request = self._verify_login(self.read())
         if isinstance(request, tuple):
             self.send_msg('OK')
             return request

@@ -42,7 +42,7 @@ class StreamThread(threading.Thread):
                     self.stream.write(self.remote.read())
 
                 else:
-                    self.remote.write(self.stream.read(self._chunk, exception_on_overflow=False), True)
+                    self.remote.write(self.stream.read(self._chunk, exception_on_overflow=False))
 
         except Exception as e:
             self.logger.debug(f'Voice {stream_type} disconnect. {type(e)}: {str(e)}')
