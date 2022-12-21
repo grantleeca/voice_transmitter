@@ -30,19 +30,17 @@ class TCPHandler(socketserver.BaseRequestHandler):
         ptc = ProtocolTCP(self.request)
         request = ptc.verify()
         if isinstance(request, tuple):
-            args = {'format': request[0],
-                    'channels': request[1],
-                    'rate': request[2]}
-
+            args = {'format': request[0], 'channels': request[1], 'rate': request[2]}
             self.logger.info(f"Service information: {args}.")
 
-            with TCPSender(self.logger, self.request, chunk=request[3], **args) as sender, \
-                    TCPReceiver(self.logger, self.request, **args) as receiver:
-                receiver.start()
-                sender.start()
+            receiver = TCPReceiver(self.logger, self.request, **args)
+            sender = TCPSender(self.logger, self.request, chunk=request[3], **args)
 
-                receiver.join()
-                sender.join()
+            receiver.start()
+            sender.start()
+
+            receiver.join()
+            sender.join()
 
         else:
             self.logger.info(request)
@@ -59,10 +57,6 @@ class TCPClient(ProtocolTCP):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    def close(self):
-        self._socket.close()
-        self._socket = None
-
     def connect(self, addr, chunk, **kwargs):
         self._logger.debug(f"Begin connect to {addr}")
 
@@ -75,14 +69,14 @@ class TCPClient(ProtocolTCP):
             self._logger.warning(f'Login failed.: {res}')
             return
 
-        with TCPReceiver(self._logger, self._socket, **kwargs) as receiver, \
-                TCPSender(self._logger, self._socket, chunk=chunk, **kwargs) as sender:
-            receiver.start()
-            sender.start()
+        receiver = TCPReceiver(self._logger, self._socket, **kwargs)
+        sender = TCPSender(self._logger, self._socket, chunk=chunk, **kwargs)
 
-            input("Press enter key to exit.")
+        receiver.start()
+        sender.start()
 
-            self._socket.close()
+        input("Press enter key to exit.")
+        self._socket.close()
 
-            sender.join()
-            receiver.join()
+        receiver.join()
+        sender.join()

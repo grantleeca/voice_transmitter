@@ -31,19 +31,17 @@ class UDPHandler(socketserver.BaseRequestHandler):
         ptc = ProtocolUDP(self.request, self.client_address)
         request = ptc.verify()
         if isinstance(request, tuple):
-            args = {'format': request[0],
-                    'channels': request[1],
-                    'rate': request[2]}
-
+            args = {'format': request[0], 'channels': request[1], 'rate': request[2]}
             self.logger.info(f"Service information: {args}.")
 
-            with UDPSender(self.logger, self.request[1], self.client_address, chunk=request[3], **args) as sender, \
-                    UDPReceiver(self.logger, self.request[1], self.client_address, **args) as receiver:
-                receiver.start()
-                sender.start()
+            receiver = UDPReceiver(self.logger, self.request[1], self.client_address, **args)
+            sender = UDPSender(self.logger, self.request[1], self.client_address, chunk=request[3], **args)
 
-                receiver.join()
-                sender.join()
+            receiver.start()
+            sender.start()
+
+            receiver.join()
+            sender.join()
 
         else:
             self.logger.info(request)
@@ -61,10 +59,6 @@ class UDPClient(ProtocolUDP):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    def close(self):
-        self._socket.close()
-        self._socket = None
-
     def connect(self, chunk, **kwargs):
         self._logger.info(f"Connected {self._address}.")
 
@@ -73,13 +67,14 @@ class UDPClient(ProtocolUDP):
             self._logger.warning(f'Login failed. {res}')
             return
 
-        with UDPReceiver(self._logger, self._socket, self._address) as receiver, \
-                UDPSender(self._logger, self._socket, self._address, chunk=chunk) as sender:
-            receiver.start()
-            sender.start()
+        receiver = UDPReceiver(self._logger, self._socket, self._address)
+        sender = UDPSender(self._logger, self._socket, self._address, chunk=chunk)
 
-            input("Press enter key to exit.")
-            self.close()
+        receiver.start()
+        sender.start()
 
-            sender.join()
-            receiver.join()
+        input("Press enter key to exit.")
+        self.close()
+
+        receiver.join()
+        sender.join()
