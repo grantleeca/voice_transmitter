@@ -3,26 +3,27 @@ import struct
 import time
 import zlib
 
+# import rsa
+
 LOGIN_FORMAT = '@20siiii'
 LOGIN_VERSION = 'AudioTransmitter 001'.encode('utf-8')
 
-PROTOCOL_HEAD = '@cci'
+PROTOCOL_HEAD_FORMAT = '@cci'
 PROTOCOL_FLAG = b'V'
+
+token: str = ''
+last_login_time = time.gmtime()
 
 
 class Protocol(object):
     def __init__(self, s: socket.socket):
         self._socket = s
 
-        # self._count = 0
-        # self._compress_count = 0
-        # self._show_time = time.perf_counter()
-
     def send(self, data):
-        pass
+        raise AssertionError('Protocol.send must be overloaded.')
 
     def recv(self, size):
-        return self._socket.recv(size)
+        raise AssertionError('Protocol.recv must be overloaded.')
 
     def close(self):
         self._socket.close()
@@ -36,9 +37,10 @@ class Protocol(object):
         return res
 
     def read(self):
-        head = self._read(struct.calcsize(PROTOCOL_HEAD))
-        flag, compress, size = struct.unpack(PROTOCOL_HEAD, head)
+        head = self._read(struct.calcsize(PROTOCOL_HEAD_FORMAT))
+        flag, compress, size = struct.unpack(PROTOCOL_HEAD_FORMAT, head)
         if flag != PROTOCOL_FLAG:
+            self.close()
             raise ConnectionError('Invalid protocol flag.')
 
         return self._read(size) if compress == b'N' else zlib.decompress(self._read(size))
@@ -46,17 +48,10 @@ class Protocol(object):
     def write(self, data, compress=False):
         if compress:
             compress_data = zlib.compress(data)
-            # self._count += len(data)
-            # self._compress_count += len(cpd)
-            # now = time.perf_counter()
-            # if now - self._show_time > 3.0:
-            #     print(f"compress {self._compress_count / self._count: .2f}")
-            #     self._show_time = now
-
-            head = struct.pack(PROTOCOL_HEAD, PROTOCOL_FLAG, b'Y', len(compress_data))
+            head = struct.pack(PROTOCOL_HEAD_FORMAT, PROTOCOL_FLAG, b'Y', len(compress_data))
             self.send(head + compress_data)
         else:
-            head = struct.pack(PROTOCOL_HEAD, PROTOCOL_FLAG, b'N', len(data))
+            head = struct.pack(PROTOCOL_HEAD_FORMAT, PROTOCOL_FLAG, b'N', len(data))
             self.send(head + data)
 
     def login(self, format, channels, rate, chunk):

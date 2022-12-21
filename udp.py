@@ -37,13 +37,13 @@ class UDPHandler(socketserver.BaseRequestHandler):
 
             self.logger.info(f"Service information: {args}.")
 
-            with UDPSender(self.logger, self.request[1], self.client_address, chunk=request[3], **args) as client, \
-                    UDPReceiver(self.logger, self.request[1], self.client_address, **args) as server:
-                server.start()
-                client.start()
+            with UDPSender(self.logger, self.request[1], self.client_address, chunk=request[3], **args) as sender, \
+                    UDPReceiver(self.logger, self.request[1], self.client_address, **args) as receiver:
+                receiver.start()
+                sender.start()
 
-                server.join()
-                client.join()
+                receiver.join()
+                sender.join()
 
         else:
             self.logger.info(request)
@@ -72,13 +72,13 @@ class UDPClient(ProtocolUDP):
             self._logger.warning(f'Login failed.')
             return
 
-        with UDPReceiver(self._logger, self._socket, self._address) as server, \
-                UDPSender(self._logger, self._socket, self._address, chunk=chunk) as client:
-            server.start()
-            client.start()
+        with UDPReceiver(self._logger, self._socket, self._address) as receiver, \
+                UDPSender(self._logger, self._socket, self._address, chunk=chunk) as sender:
+            receiver.start()
+            sender.start()
 
             input("Press enter key to exit.")
             self.close()
 
-            client.join()
-            server.join()
+            sender.join()
+            receiver.join()

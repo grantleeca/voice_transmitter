@@ -1,6 +1,5 @@
 import logging
 import threading
-import time
 
 import pyaudio
 
@@ -41,8 +40,6 @@ class StreamThread(threading.Thread):
             stream_type = 'Sender'
 
         try:
-            start_time = time.perf_counter()
-            count = 0
 
             while True:
                 if self._chunk is None:
@@ -51,13 +48,6 @@ class StreamThread(threading.Thread):
                 else:
                     data = self.stream.read(self._chunk)
                     self.socket.write(data, True)
-
-                count += len(data)
-                end_time = time.perf_counter()
-                if end_time - start_time > 1.0:
-                    self.logger.info(f"{stream_type} speed: {count / 1024 / (end_time - start_time): .2f} KB/s.")
-                    start_time = end_time
-                    count = 0
 
         except Exception as e:
             self.logger.debug(f'Voice {stream_type} disconnect. {type(e)}: {str(e)}')

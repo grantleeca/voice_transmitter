@@ -36,13 +36,13 @@ class TCPHandler(socketserver.BaseRequestHandler):
 
             self.logger.info(f"Service information: {args}.")
 
-            with TCPSender(self.logger, self.request, chunk=request[3], **args) as client, \
-                    TCPReceiver(self.logger, self.request, **args) as server:
-                server.start()
-                client.start()
+            with TCPSender(self.logger, self.request, chunk=request[3], **args) as sender, \
+                    TCPReceiver(self.logger, self.request, **args) as receiver:
+                receiver.start()
+                sender.start()
 
-                server.join()
-                client.join()
+                receiver.join()
+                sender.join()
 
         else:
             self.logger.info(request)
@@ -74,13 +74,13 @@ class TCPClient(ProtocolTCP):
             self._logger.warning(f'Login failed.')
             return
 
-        with TCPReceiver(self._logger, self._socket, **kwargs) as server, \
-                TCPSender(self._logger, self._socket, chunk=chunk, **kwargs) as client:
-            server.start()
-            client.start()
+        with TCPReceiver(self._logger, self._socket, **kwargs) as receiver, \
+                TCPSender(self._logger, self._socket, chunk=chunk, **kwargs) as sender:
+            receiver.start()
+            sender.start()
 
             input("Press enter key to exit.")
             self._socket.close()
 
-            client.join()
-            server.join()
+            sender.join()
+            receiver.join()
