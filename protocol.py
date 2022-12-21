@@ -22,7 +22,7 @@ class Protocol(object):
     @classmethod
     def set_token(cls, token):
         cls.token = token
-        cls.last_login_time = calendar.timegm(time.gmtime())
+        cls.last_login_time = calendar.timegm(time.gmtime()) - 300
 
     @classmethod
     def hash_token(cls, nt: int):
@@ -41,7 +41,7 @@ class Protocol(object):
             return 'Invalid request version.'
 
         if response[5] <= cls.last_login_time:
-            return 'Invalid login time.'
+            return f'Invalid login time. {response[5]} <= {cls.last_login_time}'
 
         if cls.hash_token(response[5]) != data[LOGIN_LENGTH:]:
             return 'Token verify failed.'
@@ -98,8 +98,7 @@ class Protocol(object):
 
         self._socket.settimeout(None)
 
-        data = self.read()
-        return True if data.strip().decode('utf-8') == 'OK' else False
+        return self.read().strip().decode('utf-8')
 
     def verify(self):
         data = self.read()

@@ -70,8 +70,9 @@ class TCPClient(ProtocolTCP):
 
         self._logger.info(f"Connected {addr}.")
 
-        if not self.login(chunk=chunk, **kwargs):
-            self._logger.warning(f'Login failed.')
+        res = self.login(chunk=chunk, **kwargs)
+        if res != 'OK':
+            self._logger.warning(f'Login failed.: {res}')
             return
 
         with TCPReceiver(self._logger, self._socket, **kwargs) as receiver, \
