@@ -29,7 +29,7 @@ class TCPHandler(socketserver.BaseRequestHandler):
 
         ptc = ProtocolTCP(self.request)
         request = ptc.verify()
-        if isinstance(request, tuple):
+        if isinstance(request, list):
             args = {'format': request[0],
                     'channels': request[1],
                     'rate': request[2]}

@@ -104,7 +104,7 @@ class Protocol(object):
     def verify(self):
         data = self.read()
         request = self._verify_login(data)
-        if isinstance(request, tuple):
+        if isinstance(request, list):
             self.send_msg('OK')
             return request
 
