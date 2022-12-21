@@ -68,7 +68,8 @@ class UDPClient(ProtocolUDP):
     def connect(self, chunk, **kwargs):
         self._logger.info(f"Connected {self._address}.")
 
-        if res := self.login(chunk=chunk, **kwargs) != 'OK':
+        res = self.login(chunk=chunk, **kwargs)
+        if res != 'OK':
             self._logger.warning(f'Login failed. {res}')
             return
 
