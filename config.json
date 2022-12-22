@@ -6,13 +6,13 @@
     "chunk": 1024
   },
   "server": {
-    "model": "UDP",
+    "model": "TCP",
     "port": 1029,
     "password": "Maya*518",
     "compress": false
   },
   "client": {
-    "model": "UDP",
+    "model": "TCP",
     "host": "192.168.1.50",
     "#host": "45.74.72.134",
     "port": 1029,
