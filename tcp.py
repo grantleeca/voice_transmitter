@@ -29,7 +29,7 @@ class TCPHandler(socketserver.BaseRequestHandler):
         self.logger.info(f"{self.client_address} linked.")
 
         ptc = ProtocolTCP(self.request)
-        request = ptc.verify()
+        request = ptc.verify(ptc.read())
         if isinstance(request, tuple):
             args = {'format': request[0], 'channels': request[1], 'rate': request[2]}
             self.logger.info(f"Service information: {request}.")
@@ -82,6 +82,5 @@ class TCPClient(ProtocolTCP):
             receiver.join()
             sender.join()
 
-            self._socket.close()
         else:
             self._logger.warning(f'Login failed.: {res}')

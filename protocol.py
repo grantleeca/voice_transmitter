@@ -118,9 +118,10 @@ class ProtocolTCP(Protocol):
 
 
 class ProtocolUDP(Protocol):
-    def __init__(self, s: socket.socket, address):
+    def __init__(self, s: socket.socket, address, data=None):
         super().__init__(s)
         self._address = address
+        self._buffer = data if data else []
 
     def send(self, data):
         self._socket.sendto(data, self._address)
@@ -130,3 +131,22 @@ class ProtocolUDP(Protocol):
             result = self._socket.recvfrom(size)
             if result[1] == self._address:
                 return result[0]
+
+    def _read(self, size):
+        while len(self._buffer) < size:
+            response = self._socket.recvfrom(8192)
+            if response[1] == self._address:
+                self._buffer += response[0]
+
+        result = self._buffer[:size]
+        self._buffer = self._buffer[size:]
+        return result
+
+    # def unpack(self, data):
+    #     head = data[:LOGIN_LENGTH]
+    #     flag, compress, size = struct.unpack(PROTOCOL_HEAD_FORMAT, head)
+    #     if flag != PROTOCOL_FLAG or len(data) - LOGIN_LENGTH != size:
+    #         self.close()
+    #         raise ConnectionError('Invalid protocol flag.')
+    #
+    #     return data[LOGIN_LENGTH:] if compress == b'N' else zlib.decompress(data[LOGIN_LENGTH:])

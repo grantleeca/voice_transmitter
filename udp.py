@@ -1,9 +1,10 @@
 import logging
 import socket
 import socketserver
+import time
 
 from protocol import ProtocolUDP
-from stream_thread import StreamThread
+from stream_thread import StreamThread, InputThread
 
 
 class UDPReceiver(StreamThread):
@@ -28,7 +29,7 @@ class UDPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         self.logger.info(f"{self.client_address} linked.")
 
-        ptc = ProtocolUDP(self.request, self.client_address)
+        ptc = ProtocolUDP(self.request[1], self.client_address, self.request[0])
         request = ptc.verify()
         if isinstance(request, tuple):
             args = {'format': request[0], 'channels': request[1], 'rate': request[2]}
@@ -63,18 +64,23 @@ class UDPClient(ProtocolUDP):
         self._logger.info(f"Connected {self._address}.")
 
         res = self.login(chunk=chunk, **kwargs)
-        if res != 'OK':
+        if res == 'OK':
+            receiver = UDPReceiver(self._logger, self._socket, self._address)
+            sender = UDPSender(self._logger, self._socket, self._address, chunk=chunk)
+            input_key = InputThread()
+
+            receiver.start()
+            sender.start()
+            input_key.start()
+
+            while receiver.is_alive() and sender.is_alive() and input_key.is_alive():
+                time.sleep(1)
+
+            StreamThread.stop = True
+
+            receiver.join()
+            sender.join()
+
+        else:
             self._logger.warning(f'Login failed. {res}')
-            return
 
-        receiver = UDPReceiver(self._logger, self._socket, self._address)
-        sender = UDPSender(self._logger, self._socket, self._address, chunk=chunk)
-
-        receiver.start()
-        sender.start()
-
-        input("Press enter key to exit.")
-        self.close()
-
-        receiver.join()
-        sender.join()
