@@ -59,6 +59,7 @@ class Protocol(object):
     def __init__(self, logger: logging.Logger, s: socket.socket):
         self._logger = logger
         self._socket = s
+        self._buffer = b''
 
     def send(self, data):
         raise AssertionError('Protocol.send must be overloaded.')
@@ -70,12 +71,7 @@ class Protocol(object):
         self._socket.close()
 
     def _read(self, size):
-        res = b''
-        while len(res) < size:
-            buf = self.recv(size - len(res))
-            res += buf
-
-        return res
+        raise AssertionError('Protocol._read must be overloaded.')
 
     def read(self):
         head = self._read(struct.calcsize(PROTOCOL_HEAD_FORMAT))
@@ -116,8 +112,13 @@ class ProtocolTCP(Protocol):
     def send(self, data):
         self._socket.sendall(data)
 
-    def recv(self, size):
-        return self._socket.recv(size)
+    def _read(self, size):
+        while len(self._buffer) < size:
+            self._buffer += self._socket.recv(8192)
+
+        result = self._buffer[:size]
+        self._buffer = self._buffer[size:]
+        return result
 
 
 class ProtocolUDP(Protocol):
@@ -129,12 +130,6 @@ class ProtocolUDP(Protocol):
     def send(self, data):
         self._socket.sendto(data, self._address)
 
-    def recv(self, size):
-        while True:
-            result = self._socket.recvfrom(size)
-            if result[1] == self._address:
-                return result[0]
-
     def _read(self, size):
         while len(self._buffer) < size:
             response = self._socket.recvfrom(8192)
@@ -144,12 +139,3 @@ class ProtocolUDP(Protocol):
         result = self._buffer[:size]
         self._buffer = self._buffer[size:]
         return result
-
-    # def unpack(self, data):
-    #     head = data[:LOGIN_LENGTH]
-    #     flag, compress, size = struct.unpack(PROTOCOL_HEAD_FORMAT, head)
-    #     if flag != PROTOCOL_FLAG or len(data) - LOGIN_LENGTH != size:
-    #         self.close()
-    #         raise ConnectionError('Invalid protocol flag.')
-    #
-    #     return data[LOGIN_LENGTH:] if compress == b'N' else zlib.decompress(data[LOGIN_LENGTH:])

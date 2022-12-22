@@ -55,6 +55,7 @@ class StreamThread(Thread):
                     self.remote.write(self.stream.read(self._chunk, exception_on_overflow=False))
 
         except Exception as e:
+            self.stop = True
             self.logger.exception(f'{stream_type} exception. {type(e)}: {str(e)}')
 
         finally:
