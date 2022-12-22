@@ -29,7 +29,7 @@ class UDPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         self.logger.info(f"{self.client_address} linked.")
 
-        ptc = ProtocolUDP(self.request[1], self.client_address, self.request[0])
+        ptc = ProtocolUDP(logger=self.logger, s=self.request[1], address=self.client_address, data=self.request[0])
         request = ptc.verify()
         if isinstance(request, tuple):
             args = {'format': request[0], 'channels': request[1], 'rate': request[2]}
@@ -65,8 +65,8 @@ class UDPClient(ProtocolUDP):
 
         res = self.login(chunk=chunk, **kwargs)
         if res == 'OK':
-            receiver = UDPReceiver(self._logger, self._socket, self._address)
-            sender = UDPSender(self._logger, self._socket, self._address, chunk=chunk)
+            receiver = UDPReceiver(self._logger, self._socket, self._address, **kwargs)
+            sender = UDPSender(self._logger, self._socket, self._address, chunk=chunk, **kwargs)
             input_key = InputThread()
 
             receiver.start()
