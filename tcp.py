@@ -9,14 +9,14 @@ from stream_thread import StreamThread, InputThread
 
 class TCPReceiver(StreamThread):
     def __init__(self, logger: logging.Logger, s: socket.socket, **kwargs):
-        super().__init__(logger, ProtocolTCP(s))
+        super().__init__(logger, ProtocolTCP(logger, s))
 
         self.stream = self.open_stream(output=True, **kwargs)
 
 
 class TCPSender(StreamThread):
     def __init__(self, logger: logging.Logger, s: socket.socket, chunk, **kwargs):
-        super().__init__(logger, ProtocolTCP(s))
+        super().__init__(logger, ProtocolTCP(logger, s))
 
         self._chunk = chunk
         self.stream = self.open_stream(input=True, frames_per_buffer=chunk, **kwargs)
@@ -28,8 +28,8 @@ class TCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         self.logger.info(f"{self.client_address} linked.")
 
-        ptc = ProtocolTCP(self.request)
-        request = ptc.verify(ptc.read())
+        ptc = ProtocolTCP(self.logger, self.request)
+        request = ptc.verify()
         if isinstance(request, tuple):
             args = {'format': request[0], 'channels': request[1], 'rate': request[2]}
             self.logger.info(f"Service information: {request}.")
@@ -50,7 +50,7 @@ class TCPHandler(socketserver.BaseRequestHandler):
 class TCPClient(ProtocolTCP):
     def __init__(self, logger: logging.Logger):
         self._logger = logger
-        super().__init__(socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+        super().__init__(logger, socket.socket(socket.AF_INET, socket.SOCK_STREAM))
 
     def __enter__(self):
         return self

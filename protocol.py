@@ -1,5 +1,6 @@
 import calendar
 import hashlib
+import logging
 import socket
 import struct
 import time
@@ -55,7 +56,8 @@ class Protocol(object):
         data = struct.pack(LOGIN_FORMAT, LOGIN_VERSION, format, channels, rate, chunk, now)
         return data + cls.make_token(now)
 
-    def __init__(self, s: socket.socket):
+    def __init__(self, logger: logging.Logger, s: socket.socket):
+        self._logger = logger
         self._socket = s
 
     def send(self, data):
@@ -95,6 +97,7 @@ class Protocol(object):
 
     def login(self, format, channels, rate, chunk):
         self.write(self._pack_login(format, channels, rate, chunk))
+        self._logger.debug('Send login request, wait reply.')
         return self.read().strip().decode('utf-8')
 
     def verify(self):
@@ -118,10 +121,10 @@ class ProtocolTCP(Protocol):
 
 
 class ProtocolUDP(Protocol):
-    def __init__(self, s: socket.socket, address, data=None):
-        super().__init__(s)
+    def __init__(self, logger: logging.Logger, s: socket.socket, address, data=None):
+        super().__init__(logger, s)
         self._address = address
-        self._buffer = data if data else []
+        self._buffer = data if data else b''
 
     def send(self, data):
         self._socket.sendto(data, self._address)

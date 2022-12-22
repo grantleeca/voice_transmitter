@@ -10,14 +10,14 @@ from stream_thread import StreamThread, InputThread
 class UDPReceiver(StreamThread):
     def __init__(self, logger: logging.Logger, s: socket.socket, address, **kwargs):
         s.settimeout(3.0)
-        super().__init__(logger, ProtocolUDP(s, address))
+        super().__init__(logger, ProtocolUDP(logger, s, address))
 
         self.stream = self.open_stream(output=True, **kwargs)
 
 
 class UDPSender(StreamThread):
     def __init__(self, logger: logging.Logger, s: socket.socket, address, chunk, **kwargs):
-        super().__init__(logger, ProtocolUDP(s, address))
+        super().__init__(logger, ProtocolUDP(logger, s, address))
 
         self._chunk = chunk
         self.stream = self.open_stream(input=True, frames_per_buffer=chunk, **kwargs)
@@ -50,7 +50,7 @@ class UDPHandler(socketserver.BaseRequestHandler):
 
 class UDPClient(ProtocolUDP):
     def __init__(self, logger, address):
-        super().__init__(socket.socket(socket.AF_INET, socket.SOCK_DGRAM), address)
+        super().__init__(logger, socket.socket(socket.AF_INET, socket.SOCK_DGRAM), address)
 
         self._logger = logger
 
@@ -83,4 +83,3 @@ class UDPClient(ProtocolUDP):
 
         else:
             self._logger.warning(f'Login failed. {res}')
-
