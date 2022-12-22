@@ -5,10 +5,8 @@ import struct
 import time
 import zlib
 
-# import rsa
-
 LOGIN_VERSION = 'AudioTransmitter 001'.encode('utf-8')
-LOGIN_FORMAT = '!20siiiii'
+LOGIN_FORMAT = '!20s5i'
 LOGIN_LENGTH = struct.calcsize(LOGIN_FORMAT)
 
 PROTOCOL_HEAD_FORMAT = '!cci'
@@ -16,21 +14,21 @@ PROTOCOL_FLAG = b'V'
 
 
 class Protocol(object):
-    token: str = 'password'
+    passwd: str = 'password'
     compress: bool = True
     last_login_time: int = 0
 
     @classmethod
-    def setup(cls, token, compress):
-        cls.token = token
+    def setup(cls, password, compress):
+        cls.passwd = password
         cls.compress = compress
         cls.last_login_time = 0
 
     @classmethod
-    def hash_token(cls, nt: int):
+    def make_token(cls, num: int):
         hash512 = hashlib.sha512()
-        hash512.update(cls.token.encode('utf-8'))
-        hash512.update(struct.pack('!i', nt))
+        hash512.update(cls.passwd.encode('utf-8'))
+        hash512.update(struct.pack('!i', num))
         return hash512.digest()
 
     @classmethod
@@ -45,7 +43,7 @@ class Protocol(object):
         if response[5] <= cls.last_login_time:
             return f'Invalid login time. {response[5]} <= {cls.last_login_time}'
 
-        if cls.hash_token(response[5]) != data[LOGIN_LENGTH:]:
+        if cls.make_token(response[5]) != data[LOGIN_LENGTH:]:
             return 'Token verify failed.'
 
         cls.last_login_time = response[5]
@@ -55,7 +53,7 @@ class Protocol(object):
     def _pack_login(cls, format, channels, rate, chunk):
         now = calendar.timegm(time.gmtime())
         data = struct.pack(LOGIN_FORMAT, LOGIN_VERSION, format, channels, rate, chunk, now)
-        return data + cls.hash_token(now)
+        return data + cls.make_token(now)
 
     def __init__(self, s: socket.socket):
         self._socket = s

@@ -1,12 +1,12 @@
 import logging
-import threading
+from threading import Thread
 
 import pyaudio
 
 from protocol import Protocol
 
 
-class StreamThread(threading.Thread):
+class StreamThread(Thread):
     pa = None
 
     @classmethod

@@ -1,9 +1,19 @@
 import logging
 import socket
 import socketserver
+import sys
+
+import select
 
 from protocol import ProtocolTCP
 from stream_thread import StreamThread
+
+
+def input_timeout(msg, timeout):
+    print(msg, end=': ')
+    key, _, _ = select.select([sys.stdin], [], [], timeout)
+
+    return sys.stdin.readline().strip() if key else None
 
 
 class TCPReceiver(StreamThread):
@@ -61,22 +71,22 @@ class TCPClient(ProtocolTCP):
         self._logger.debug(f"Begin connect to {addr}")
 
         self._socket.connect(addr)
-
         self._logger.info(f"Connected {addr}.")
 
         res = self.login(chunk=chunk, **kwargs)
-        if res != 'OK':
+        if res == 'OK':
+            receiver = TCPReceiver(self._logger, self._socket, **kwargs)
+            sender = TCPSender(self._logger, self._socket, chunk=chunk, **kwargs)
+
+            receiver.start()
+            sender.start()
+
+            while receiver.is_alive() and sender.is_alive():
+                input_timeout("Press any key to exit", 1)
+
+            self._socket.close()
+
+            receiver.join()
+            sender.join()
+        else:
             self._logger.warning(f'Login failed.: {res}')
-            return
-
-        receiver = TCPReceiver(self._logger, self._socket, **kwargs)
-        sender = TCPSender(self._logger, self._socket, chunk=chunk, **kwargs)
-
-        receiver.start()
-        sender.start()
-
-        input("Press enter key to exit.")
-        self._socket.close()
-
-        receiver.join()
-        sender.join()

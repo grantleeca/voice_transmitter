@@ -8,7 +8,7 @@
   "server": {
     "model": "TCP",
     "port": 1029,
-    "token": "Maya*518",
+    "password": "Maya*518",
     "compress": false
   },
   "client": {
@@ -16,7 +16,7 @@
     "host": "192.168.1.50",
     "#host": "45.74.72.134",
     "port": 1029,
-    "token": "Maya*518",
+    "password": "Maya*518",
     "compress": false
   },
   "logging": {
