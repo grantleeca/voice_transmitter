@@ -3,7 +3,7 @@
     "format": 8,
     "channels": 1,
     "rate": 44100,
-    "chunk": 2205
+    "chunk": 1024
   },
   "server": {
     "model": "TCP",

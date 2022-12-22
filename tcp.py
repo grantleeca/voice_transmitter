@@ -1,19 +1,10 @@
 import logging
 import socket
 import socketserver
-import sys
-
-import select
+import time
 
 from protocol import ProtocolTCP
-from stream_thread import StreamThread
-
-
-def input_timeout(msg, timeout):
-    print(msg, end=': ')
-    key, _, _ = select.select([sys.stdin], [], [], timeout)
-
-    return sys.stdin.readline().strip() if key else None
+from stream_thread import StreamThread, InputThread
 
 
 class TCPReceiver(StreamThread):
@@ -41,7 +32,7 @@ class TCPHandler(socketserver.BaseRequestHandler):
         request = ptc.verify()
         if isinstance(request, tuple):
             args = {'format': request[0], 'channels': request[1], 'rate': request[2]}
-            self.logger.info(f"Service information: {args}.")
+            self.logger.info(f"Service information: {request}.")
 
             receiver = TCPReceiver(self.logger, self.request, **args)
             sender = TCPSender(self.logger, self.request, chunk=request[3], **args)
@@ -77,16 +68,20 @@ class TCPClient(ProtocolTCP):
         if res == 'OK':
             receiver = TCPReceiver(self._logger, self._socket, **kwargs)
             sender = TCPSender(self._logger, self._socket, chunk=chunk, **kwargs)
+            input_key = InputThread()
 
             receiver.start()
             sender.start()
+            input_key.start()
 
-            while receiver.is_alive() and sender.is_alive():
-                input_timeout("Press any key to exit", 1)
+            while receiver.is_alive() and sender.is_alive() and input_key.is_alive():
+                time.sleep(1)
 
-            self._socket.close()
+            StreamThread.stop = True
 
             receiver.join()
             sender.join()
+
+            self._socket.close()
         else:
             self._logger.warning(f'Login failed.: {res}')
