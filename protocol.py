@@ -10,8 +10,9 @@ LOGIN_VERSION = 'AudioTransmitter 001'.encode('utf-8')
 LOGIN_FORMAT = '!20s5i'
 LOGIN_LENGTH = struct.calcsize(LOGIN_FORMAT)
 
-PROTOCOL_HEAD_FORMAT = '!cci'
+PROTOCOL_HEAD_FORMAT = '!icc'
 PROTOCOL_FLAG = b'V'
+PROTOCOL_HEAD_LENGTH = struct.calcsize(PROTOCOL_HEAD_FORMAT)
 
 
 class Protocol(object):
@@ -74,21 +75,22 @@ class Protocol(object):
         raise AssertionError('Protocol._read must be overloaded.')
 
     def read(self):
-        head = self._read(struct.calcsize(PROTOCOL_HEAD_FORMAT))
-        flag, compress, size = struct.unpack(PROTOCOL_HEAD_FORMAT, head)
+        head = self._read(PROTOCOL_HEAD_LENGTH)
+        size, flag, compress = struct.unpack(PROTOCOL_HEAD_FORMAT, head)
         if flag != PROTOCOL_FLAG:
             self.close()
             raise ConnectionError('Invalid protocol flag.')
 
+        size -= PROTOCOL_HEAD_LENGTH
         return self._read(size) if compress == b'N' else zlib.decompress(self._read(size))
 
     def write(self, data):
         if self.compress:
             compress_data = zlib.compress(data)
-            head = struct.pack(PROTOCOL_HEAD_FORMAT, PROTOCOL_FLAG, b'Y', len(compress_data))
+            head = struct.pack(PROTOCOL_HEAD_FORMAT, len(compress_data) + PROTOCOL_HEAD_LENGTH, PROTOCOL_FLAG, b'Y')
             self.send(head + compress_data)
         else:
-            head = struct.pack(PROTOCOL_HEAD_FORMAT, PROTOCOL_FLAG, b'N', len(data))
+            head = struct.pack(PROTOCOL_HEAD_FORMAT, len(data) + PROTOCOL_HEAD_LENGTH, PROTOCOL_FLAG, b'N')
             self.send(head + data)
 
     def login(self, format, channels, rate, chunk):
