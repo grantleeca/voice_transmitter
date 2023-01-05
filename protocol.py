@@ -1,36 +1,36 @@
 import calendar
 import hashlib
+import logging
 import socket
 import struct
 import time
 import zlib
 
-# import rsa
-
 LOGIN_VERSION = 'AudioTransmitter 001'.encode('utf-8')
-LOGIN_FORMAT = '!20siiiii'
+LOGIN_FORMAT = '!20s5i'
 LOGIN_LENGTH = struct.calcsize(LOGIN_FORMAT)
 
-PROTOCOL_HEAD_FORMAT = '!cci'
+PROTOCOL_HEAD_FORMAT = '!icc'
 PROTOCOL_FLAG = b'V'
+PROTOCOL_HEAD_LENGTH = struct.calcsize(PROTOCOL_HEAD_FORMAT)
 
 
 class Protocol(object):
-    token: str = 'password'
+    passwd: str = 'password'
     compress: bool = True
     last_login_time: int = 0
 
     @classmethod
-    def setup(cls, token, compress):
-        cls.token = token
+    def setup(cls, password, compress):
+        cls.passwd = password
         cls.compress = compress
         cls.last_login_time = 0
 
     @classmethod
-    def hash_token(cls, nt: int):
+    def make_token(cls, num: int):
         hash512 = hashlib.sha512()
-        hash512.update(cls.token.encode('utf-8'))
-        hash512.update(struct.pack('!i', nt))
+        hash512.update(cls.passwd.encode('utf-8'))
+        hash512.update(struct.pack('!i', num))
         return hash512.digest()
 
     @classmethod
@@ -45,7 +45,7 @@ class Protocol(object):
         if response[5] <= cls.last_login_time:
             return f'Invalid login time. {response[5]} <= {cls.last_login_time}'
 
-        if cls.hash_token(response[5]) != data[LOGIN_LENGTH:]:
+        if cls.make_token(response[5]) != data[LOGIN_LENGTH:]:
             return 'Token verify failed.'
 
         cls.last_login_time = response[5]
@@ -55,10 +55,12 @@ class Protocol(object):
     def _pack_login(cls, format, channels, rate, chunk):
         now = calendar.timegm(time.gmtime())
         data = struct.pack(LOGIN_FORMAT, LOGIN_VERSION, format, channels, rate, chunk, now)
-        return data + cls.hash_token(now)
+        return data + cls.make_token(now)
 
-    def __init__(self, s: socket.socket):
+    def __init__(self, logger: logging.Logger, s: socket.socket):
+        self._logger = logger
         self._socket = s
+        self._buffer = b''
 
     def send(self, data):
         raise AssertionError('Protocol.send must be overloaded.')
@@ -70,33 +72,30 @@ class Protocol(object):
         self._socket.close()
 
     def _read(self, size):
-        res = b''
-        while len(res) < size:
-            buf = self.recv(size - len(res))
-            res += buf
-
-        return res
+        raise AssertionError('Protocol._read must be overloaded.')
 
     def read(self):
-        head = self._read(struct.calcsize(PROTOCOL_HEAD_FORMAT))
-        flag, compress, size = struct.unpack(PROTOCOL_HEAD_FORMAT, head)
+        head = self._read(PROTOCOL_HEAD_LENGTH)
+        size, flag, compress = struct.unpack(PROTOCOL_HEAD_FORMAT, head)
         if flag != PROTOCOL_FLAG:
             self.close()
             raise ConnectionError('Invalid protocol flag.')
 
+        size -= PROTOCOL_HEAD_LENGTH
         return self._read(size) if compress == b'N' else zlib.decompress(self._read(size))
 
     def write(self, data):
         if self.compress:
             compress_data = zlib.compress(data)
-            head = struct.pack(PROTOCOL_HEAD_FORMAT, PROTOCOL_FLAG, b'Y', len(compress_data))
+            head = struct.pack(PROTOCOL_HEAD_FORMAT, len(compress_data) + PROTOCOL_HEAD_LENGTH, PROTOCOL_FLAG, b'Y')
             self.send(head + compress_data)
         else:
-            head = struct.pack(PROTOCOL_HEAD_FORMAT, PROTOCOL_FLAG, b'N', len(data))
+            head = struct.pack(PROTOCOL_HEAD_FORMAT, len(data) + PROTOCOL_HEAD_LENGTH, PROTOCOL_FLAG, b'N')
             self.send(head + data)
 
     def login(self, format, channels, rate, chunk):
         self.write(self._pack_login(format, channels, rate, chunk))
+        self._logger.debug('Send login request, wait reply.')
         return self.read().strip().decode('utf-8')
 
     def verify(self):
@@ -115,20 +114,30 @@ class ProtocolTCP(Protocol):
     def send(self, data):
         self._socket.sendall(data)
 
-    def recv(self, size):
-        return self._socket.recv(size)
+    def _read(self, size):
+        while len(self._buffer) < size:
+            self._buffer += self._socket.recv(8192)
+
+        result = self._buffer[:size]
+        self._buffer = self._buffer[size:]
+        return result
 
 
 class ProtocolUDP(Protocol):
-    def __init__(self, s: socket.socket, address):
-        super().__init__(s)
+    def __init__(self, logger: logging.Logger, s: socket.socket, address, data=None):
+        super().__init__(logger, s)
         self._address = address
+        self._buffer = data if data else b''
 
     def send(self, data):
         self._socket.sendto(data, self._address)
 
-    def recv(self, size):
-        while True:
-            result = self._socket.recvfrom(size)
-            if result[1] == self._address:
-                return result[0]
+    def _read(self, size):
+        while len(self._buffer) < size:
+            response = self._socket.recvfrom(8192)
+            if response[1] == self._address:
+                self._buffer += response[0]
+
+        result = self._buffer[:size]
+        self._buffer = self._buffer[size:]
+        return result

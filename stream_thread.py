@@ -1,13 +1,23 @@
 import logging
-import threading
+from threading import Thread
 
 import pyaudio
 
 from protocol import Protocol
 
 
-class StreamThread(threading.Thread):
+class InputThread(Thread):
+    def __init__(self):
+        super().__init__()
+        self.daemon = True
+
+    def run(self) -> None:
+        input('Press enter key to exit.')
+
+
+class StreamThread(Thread):
     pa = None
+    stop = False
 
     @classmethod
     def open_stream(cls, **kwargs):
@@ -37,7 +47,7 @@ class StreamThread(threading.Thread):
             stream_type = 'Sender'
 
         try:
-            while True:
+            while not self.stop:
                 if self._chunk is None:
                     self.stream.write(self.remote.read())
 
@@ -45,7 +55,8 @@ class StreamThread(threading.Thread):
                     self.remote.write(self.stream.read(self._chunk, exception_on_overflow=False))
 
         except Exception as e:
-            self.logger.debug(f'Voice {stream_type} disconnect. {type(e)}: {str(e)}')
+            self.stop = True
+            self.logger.exception(f'{stream_type} exception. {type(e)}: {str(e)}')
 
         finally:
             self.stream.stop_stream()
